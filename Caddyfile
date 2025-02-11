@@ -1,65 +1,65 @@
 {
-    default_sni {$VIRTUAL_HOST}
+	default_sni {$VIRTUAL_HOST}
 }
 
 (cors) {
-       @cors_preflight method OPTIONS
-       header {
-               Access-Control-Allow-Origin "{args.0}"
-               Vary Origin
-               Access-Control-Allow-Headers "*"
-               Access-Control-Expose-Headers "Authorization, Link, X-Result-Count"
-               Access-Control-Allow-Credentials "true"
-       }
-       handle @cors_preflight {
-               header {
-                       Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE"
-                       Access-Control-Allow-Headers "*"
-                       Access-Control-Max-Age "3600"
-               }
-               respond "" 204
-       }
+	@cors_preflight method OPTIONS
+	header {
+		Access-Control-Allow-Origin "{args.0}"
+		Vary Origin
+		Access-Control-Allow-Headers "*"
+		Access-Control-Expose-Headers "Authorization, Link, X-Result-Count"
+		Access-Control-Allow-Credentials "true"
+	}
+	handle @cors_preflight {
+		header {
+			Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE"
+			Access-Control-Allow-Headers "*"
+			Access-Control-Max-Age "3600"
+		}
+		respond "" 204
+	}
 }
 
 {$VIRTUAL_HOST} {
-   tls {$TLS}
+	tls {$TLS}
 
-   handle_errors {
-       header {
-           Access-Control-Allow-Origin "{header.origin}"
-           Access-Control-Allow-Credentials "true"
-           Vary Origin
-       }
-       respond "{http.error.status_code} {http.error.status_text}" {http.error.status_code}
-   }
+	handle_errors {
+		header {
+			Access-Control-Allow-Origin "{header.origin}"
+			Access-Control-Allow-Credentials "true"
+			Vary Origin
+		}
+		respond "{http.error.status_code} {http.error.status_text}" {http.error.status_code}
+	}
 
-   import cors {header.origin}
+	import cors {header.origin}
 
-   reverse_proxy /* http://waldur-homeport:8080 {
-       header_down X-Frame-Options DENY
-       header_down Content-Security-Policy "base-uri 'self'; object-src 'none'; media-src 'none'; script-src 'self' www.google-analytics.com sentry.opnd.org; style-src 'self' 'unsafe-inline'; img-src 'self' www.google-analytics.com *.gravatar.com *.tile.openstreetmap.org {$VIRTUAL_HOST} blob: data: ; connect-src 'self' {$VIRTUAL_HOST} nominatim.openstreetmap.org:443 sentry.opnd.org:443 sentry.opnd.org:80; font-src 'self' data: ; frame-src 'none'; frame-ancestors 'none'"
-       header_down Strict-Transport-Security max-age=31536000 always
-       header_down -Server
-   }
+	reverse_proxy /* http://waldur-homeport:8080 {
+		header_down X-Frame-Options DENY
+		header_down Content-Security-Policy "base-uri 'self'; object-src 'none'; media-src 'none'; script-src 'self' www.google-analytics.com sentry.opnd.org; style-src 'self' 'unsafe-inline'; img-src 'self' www.google-analytics.com *.gravatar.com *.tile.openstreetmap.org {$VIRTUAL_HOST} blob: data: ; connect-src 'self' {$VIRTUAL_HOST} nominatim.openstreetmap.org:443 sentry.opnd.org:443 sentry.opnd.org:80; font-src 'self' data: ; frame-src 'none'; frame-ancestors 'none'"
+		header_down Strict-Transport-Security max-age=31536000 always
+		header_down -Server
+	}
 
-   reverse_proxy /api/* http://waldur-mastermind-api:8080
-   reverse_proxy /api-auth/* http://waldur-mastermind-api:8080
-   reverse_proxy /docs/* http://waldur-mastermind-api:8080
-   reverse_proxy /admin/* http://waldur-mastermind-api:8080
-   reverse_proxy /static/* http://waldur-mastermind-api:8080
-   reverse_proxy /media/* http://waldur-mastermind-api:8080
-   reverse_proxy /apidocs/* http://waldur-mastermind-api:8080
-   reverse_proxy /health-check/* http://waldur-mastermind-api:8080
-   reverse_proxy /auth/* http://keycloak:8080
+	reverse_proxy /api/* http://waldur-mastermind-api:8080
+	reverse_proxy /api-auth/* http://waldur-mastermind-api:8080
+	reverse_proxy /docs/* http://waldur-mastermind-api:8080
+	reverse_proxy /admin/* http://waldur-mastermind-api:8080
+	reverse_proxy /static/* http://waldur-mastermind-api:8080
+	reverse_proxy /media/* http://waldur-mastermind-api:8080
+	reverse_proxy /apidocs/* http://waldur-mastermind-api:8080
+	reverse_proxy /health-check/* http://waldur-mastermind-api:8080
+	reverse_proxy /auth/* http://keycloak:8080
 
-    route /rmqws {
-      rewrite /rmqws /ws
-      reverse_proxy http://waldur-queue:15675 {
-          header_up Host {host}
-          header_up X-Forwarded-For {remote}
-          header_up X-Real-IP {remote}
-      }
-    }
+	route /rmqws {
+		rewrite /rmqws /ws
+		reverse_proxy http://waldur-queue:15675 {
+			header_up Host {host}
+			header_up X-Forwarded-For {remote}
+			header_up X-Real-IP {remote}
+		}
+	}
 
-    import /etc/caddy-includes/*.conf
+	import /etc/caddy-includes/*.conf
 }
