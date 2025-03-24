@@ -1,4 +1,3 @@
-
 x-mastermind-environment:
   &default-mastermind-env
   - GLOBAL_SECRET_KEY=${GLOBAL_SECRET_KEY}
@@ -81,6 +80,15 @@ services:
       - ${CONFIG_FOLDER}/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
     restart: always
 
+  # Fixing permissions of mounted script launchzone
+  waldur-launchzone-init-volume:
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    user: root
+    volumes:
+      - waldur_script_launchzone:/var/lib/waldur/waldur-script-launchzone
+    command: chown -R 1001:${DOCKER_GROUP_ID} /var/lib/waldur/waldur-script-launchzone
+    restart: "no"
+
   # DB migration
   waldur-mastermind-db-migration:
     container_name: waldur-mastermind-db-migration
@@ -93,6 +101,8 @@ services:
         condition: service_healthy
       waldur-queue:
         condition: service_started
+      waldur-launchzone-init-volume:
+        condition: service_completed_successfully
     command: initdb
 
   # Whitelabeling initialization
@@ -105,6 +115,8 @@ services:
     depends_on:
       waldur-db:
         condition: service_healthy
+      waldur-launchzone-init-volume:
+        condition: service_completed_successfully
     command: init-whitelabeling
 
   # Celery
@@ -120,6 +132,8 @@ services:
       waldur-queue:
         condition: service_started
       create-celery-results-db:
+        condition: service_completed_successfully
+      waldur-launchzone-init-volume:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "celery -A waldur_core.server inspect ping"]
@@ -142,6 +156,8 @@ services:
         condition: service_healthy
       waldur-mastermind-worker:
         condition: service_started
+      waldur-launchzone-init-volume:
+        condition: service_completed_successfully
     command: beat
     restart: always
     extra_hosts: *default-mastermind-hosts
@@ -162,6 +178,8 @@ services:
         condition: service_healthy
       waldur-queue:
         condition: service_started
+      waldur-launchzone-init-volume:
+        condition: service_completed_successfully
     command: mastermind
     restart: always
     extra_hosts: *default-mastermind-hosts
