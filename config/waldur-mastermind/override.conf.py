@@ -25,9 +25,10 @@ CACHES = {
     }
 }
 
-RABBITMQ_MQTT = {
+RABBITMQ = {
     "HOST": "waldur-queue",
-    "PORT": 1883,
+    "MQTT_PORT": 1883,
+    "STOMP_PORT": 61613,
     "USER": RABBITMQ_USER,
     "PASSWORD": RABBITMQ_PASSWORD,
     "MANAGEMENT_PORT": 15672,
