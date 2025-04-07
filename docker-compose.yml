@@ -1,5 +1,3 @@
-version: '2.4'
-
 x-mastermind-environment:
   &default-mastermind-env
   - GLOBAL_SECRET_KEY=${GLOBAL_SECRET_KEY}
@@ -86,7 +84,7 @@ services:
   # DB migration
   waldur-mastermind-db-migration:
     container_name: waldur-mastermind-db-migration
-    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -99,7 +97,7 @@ services:
   # Whitelabeling initialization
   waldur-mastermind-whitelabeling-init:
     container_name: waldur-mastermind-whitelabeling-init
-    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -110,7 +108,7 @@ services:
   # Celery
   waldur-mastermind-worker:
     container_name: waldur-mastermind-worker
-    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -132,7 +130,7 @@ services:
   # Celery-beat
   waldur-mastermind-beat:
     container_name: waldur-mastermind-beat
-    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -147,7 +145,7 @@ services:
   # MasterMind API
   waldur-mastermind-api:
     container_name: waldur-mastermind-api
-    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -166,7 +164,7 @@ services:
   # HomePort
   waldur-homeport:
     container_name: waldur-homeport
-    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-homeport:${WALDUR_HOMEPORT_IMAGE_TAG}'
+    image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-homeport:${WALDUR_HOMEPORT_IMAGE_TAG}'
     environment:
       - API_URL=https://${WALDUR_DOMAIN:-localhost}/
       - TITLE=${WALDUR_TITLE:-"Waldur | Cloud Service Management"}
@@ -208,7 +206,7 @@ services:
 
   keycloak:
     container_name: keycloak
-    image: '${DOCKER_REGISTRY_PREFIX}keycloak/keycloak:25.0'
+    image: 'keycloak/keycloak:25.0'
     restart: always
     environment:
       - KC_DB=postgres
