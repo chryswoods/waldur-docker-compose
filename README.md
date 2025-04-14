@@ -280,7 +280,6 @@ You can see the list of all whitelabeling options below.
 - short_page_title
 - full_page_title
 - brand_color
-- brand_label_color
 - hero_link_label
 - hero_link_url
 - site_description
@@ -309,20 +308,20 @@ In order to enable /api/query/ endpoint please make sure that read-only user is 
 
 ```sql
 -- Create a read-only user
-CREATE USER readonly WITH PASSWORD '{readonly_password}'
+CREATE USER readonly WITH PASSWORD '{readonly_password}';
 
 -- Grant read-only access to the database
-GRANT CONNECT ON DATABASE '{database_name}' TO '{readonly_username}'
+GRANT CONNECT ON DATABASE {database_name} TO {readonly_username};
 
 -- Grant read-only access to the schema
-GRANT USAGE ON SCHEMA public TO '{readonly_username}'
+GRANT USAGE ON SCHEMA public TO {readonly_username};
 
 -- Grant read-only access to existing tables
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO '{readonly_username}'
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO {readonly_username};
 
 -- Grant read-only access to future tables
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO '{readonly_username}'
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {readonly_username};
 
 -- Revoke access to authtoken_token table
-REVOKE SELECT ON authtoken_token FROM '{readonly_username}'
+REVOKE SELECT ON authtoken_token FROM {readonly_username};
 ```

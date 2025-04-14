@@ -16,8 +16,6 @@ x-mastermind-volumes:
   &default-mastermind-volumes
   - ${CONFIG_FOLDER}/waldur-mastermind/override.conf.py:/etc/waldur/override.conf.py
   - ${CONFIG_FOLDER}/waldur-mastermind/logging.conf.py:/etc/waldur/logging.conf.py
-  - ${CONFIG_FOLDER}/waldur-mastermind/beat:/usr/local/bin/beat
-  - ${CONFIG_FOLDER}/waldur-mastermind/worker:/usr/local/bin/worker
   - ${CONFIG_FOLDER}/waldur-mastermind/saml2.conf.py:/etc/waldur/saml2.conf.py
   - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa:/etc/waldur/id_rsa
   - ${CONFIG_FOLDER}/waldur-mastermind/id_rsa.pub:/etc/waldur/id_rsa.pub
@@ -28,10 +26,11 @@ x-mastermind-volumes:
   - ${CONFIG_FOLDER}/waldur-mastermind/auth.yaml:/etc/waldur/auth.yaml
   - ${CONFIG_FOLDER}/waldur-mastermind/support.yaml:/etc/waldur/support.yaml
   - ${CONFIG_FOLDER}/waldur-mastermind/whitelabeling.yaml:/etc/waldur/whitelabeling.yaml
+  - ${CONFIG_FOLDER}/waldur-mastermind/marketplace.yaml:/etc/waldur/marketplace.yaml
+  - ${CONFIG_FOLDER}/waldur-mastermind/marketplace-script.yaml:/etc/waldur/marketplace-script.yaml
   - ${CONFIG_FOLDER}/whitelabeling:/etc/waldur/icons
-  - ${LIB_FOLDER}:/var/lib/waldur
   - /var/run/docker.sock:/var/run/docker.sock
-  - /opt/waldur-script-launchzone:/opt/waldur-script-launchzone
+  - waldur_script_launchzone:/var/lib/waldur/waldur-script-launchzone
 
 x-mastermind-hosts:
   &default-mastermind-hosts
@@ -76,15 +75,25 @@ services:
     environment:
       - RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
-    command: "/bin/bash -c \"rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_management; /opt/bitnami/scripts/rabbitmq/run.sh\""
+    command: "/bin/bash -c \"rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_management rabbitmq_web_stomp rabbitmq_stomp; /opt/bitnami/scripts/rabbitmq/run.sh\""
     volumes:
       - ${CONFIG_FOLDER}/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
     restart: always
+
+  # Fixing permissions of mounted script launchzone
+  waldur-launchzone-init-volume:
+    image: '${DOCKER_REGISTRY_PREFIX}opennode/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    user: root
+    volumes:
+      - waldur_script_launchzone:/var/lib/waldur/waldur-script-launchzone
+    command: chown -R 1001:${DOCKER_GROUP_ID} /var/lib/waldur/waldur-script-launchzone
+    restart: "no"
 
   # DB migration
   waldur-mastermind-db-migration:
     container_name: waldur-mastermind-db-migration
     image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -92,23 +101,29 @@ services:
         condition: service_healthy
       waldur-queue:
         condition: service_started
+      waldur-launchzone-init-volume:
+        condition: service_completed_successfully
     command: initdb
 
   # Whitelabeling initialization
   waldur-mastermind-whitelabeling-init:
     container_name: waldur-mastermind-whitelabeling-init
     image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
       waldur-db:
         condition: service_healthy
+      waldur-launchzone-init-volume:
+        condition: service_completed_successfully
     command: init-whitelabeling
 
   # Celery
   waldur-mastermind-worker:
     container_name: waldur-mastermind-worker
     image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -117,6 +132,8 @@ services:
       waldur-queue:
         condition: service_started
       create-celery-results-db:
+        condition: service_completed_successfully
+      waldur-launchzone-init-volume:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "celery -A waldur_core.server inspect ping"]
@@ -131,6 +148,7 @@ services:
   waldur-mastermind-beat:
     container_name: waldur-mastermind-beat
     image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -138,6 +156,8 @@ services:
         condition: service_healthy
       waldur-mastermind-worker:
         condition: service_started
+      waldur-launchzone-init-volume:
+        condition: service_completed_successfully
     command: beat
     restart: always
     extra_hosts: *default-mastermind-hosts
@@ -146,6 +166,7 @@ services:
   waldur-mastermind-api:
     container_name: waldur-mastermind-api
     image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    user: 1001:${DOCKER_GROUP_ID}
     environment: *default-mastermind-env
     volumes: *default-mastermind-volumes
     depends_on:
@@ -157,6 +178,8 @@ services:
         condition: service_healthy
       waldur-queue:
         condition: service_started
+      waldur-launchzone-init-volume:
+        condition: service_completed_successfully
     command: mastermind
     restart: always
     extra_hosts: *default-mastermind-hosts
@@ -177,7 +200,7 @@ services:
       waldur-mastermind-api:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "curl --silent --fail http://waldur-homeport/ || exit 1"]
+      test: ["CMD-SHELL", "curl --silent --fail http://waldur-homeport:8080/ || exit 1"]
       interval: 30s
       timeout: 30s
       retries: 3
@@ -275,6 +298,7 @@ volumes:
   caddy_data:
   caddy_config:
   keycloak_db:
+  waldur_script_launchzone:
 
 networks:
   default:

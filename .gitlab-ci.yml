@@ -35,41 +35,32 @@ Test compose configuration:
   script:
     - cp -vf .env.example .env
     - echo "DOCKER_REGISTRY_PREFIX=registry.hpc.ut.ee/mirror/" >> .env
-    - docker-compose -v
+    - |
+      if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]; then
+        echo "Testing using latest images"
+        sed -i 's/WALDUR_MASTERMIND_IMAGE_TAG=.*/WALDUR_MASTERMIND_IMAGE_TAG=latest/' .env
+        sed -i 's/WALDUR_HOMEPORT_IMAGE_TAG=.*/WALDUR_HOMEPORT_IMAGE_TAG=latest/' .env
+      fi
+    - docker compose version
     - docker context list
     - docker info
-    - docker-compose config
+    - docker compose config
     - echo "Pulling images:"
-    - docker-compose pull
+    - docker compose pull
     - echo "Images pulled:"
     - docker images
-    - docker-compose up waldur-mastermind-db-migration
-    - docker-compose logs --tail=100 waldur-mastermind-db-migration
-    - docker-compose up -d
-    - docker-compose ps
-    - docker-compose exec waldur-mastermind-worker status
-    - docker-compose exec waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
+    - docker compose up waldur-mastermind-db-migration
+    - docker compose logs --tail=100 waldur-mastermind-db-migration
+    - docker compose up -d
+    - docker compose ps
+    - docker compose exec waldur-mastermind-worker status
+    - docker compose exec waldur-mastermind-worker waldur createstaffuser -u admin -p password -e admin@example.com
     # Using `docker` host due to docker networking model:
     # Accessing directly to the `dind` service
     - curl -k -i https://docker | grep 200
     - curl -k -i https://docker/api/ | grep 401
     - curl -X POST -d '{"username":"admin","password":"password" }' -H "Content-type:application/json" -k -i https://docker/api-auth/password/ | grep 200
-    - mkdir docs/
-    - API_GROUPS_STRING=$(docker exec waldur-mastermind-api waldur shell -c "from waldur_core.core.api_groups_mapping import API_GROUPS; print(' '.join(API_GROUPS.keys()))")
-    - echo $API_GROUPS_STRING
-    - echo -e "# API index\n" > docs/index.md
-    - echo -e "Summary:\n" >> docs/index.md
-    - |
-      for item in $API_GROUPS_STRING
-      do
-        echo "$item"
-        curl -sLk "http://docker/docs/$item/?format=openapi" -o docs/$item-docs.json
-        item_cap=`echo ${item:0:1} | tr '[a-z]' '[A-Z]'`${item:1}
-        echo -e "# $item_cap\n\n"'!!'"swagger $item-docs.json"'!!' > docs/$item-api.md
-        echo "- [$item_cap]($item-api.md)" >> docs/index.md
-      done
   before_script:
-    - apk add docker-compose
     - apk add curl
     - |
       if [ "$TRIGGER_PROJECT_NAME" == "waldur-mastermind" ]; then
@@ -77,11 +68,6 @@ Test compose configuration:
       elif [ "$TRIGGER_PROJECT_NAME" == "waldur-homeport" ]; then
         export WALDUR_HOMEPORT_IMAGE_TAG=${TRIGGER_IMAGE_TAG}
       fi
-  artifacts:
-    # Saving generated doc files for further configuration uploading
-    paths:
-      - docs/
-    expire_in: 1 day
 
 Upload configuration guide:
   image: "registry.hpc.ut.ee/mirror/library/python:3.8-buster"
@@ -92,7 +78,6 @@ Upload configuration guide:
     - if: '$CI_COMMIT_BRANCH == "develop"'
   variables:
     GUIDE_PATH: docs/admin-guide/deployment/docker-compose.md
-    API_DOCS_PATH: docs/API/
     IMG_TARGET_PATH: docs/admin-guide/deployment/img
   script:
     - cd /tmp/
@@ -101,9 +86,6 @@ Upload configuration guide:
     - git config --global user.name "$GITLAB_USER_NAME"
     - git config --global user.email "$GITLAB_USER_EMAIL"
     - cp -vf ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}/README.md $GUIDE_PATH
-    - mkdir -p $API_DOCS_PATH
-    - cp -vf ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}/docs/* $API_DOCS_PATH
-    - git add $API_DOCS_PATH
     - mkdir -p docs/admin-guide/deployment/img
     - cp -vf ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}/img/* $IMG_TARGET_PATH
     - git add $IMG_TARGET_PATH
