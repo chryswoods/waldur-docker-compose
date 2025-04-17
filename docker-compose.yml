@@ -82,7 +82,7 @@ services:
 
   # Fixing permissions of mounted script launchzone
   waldur-launchzone-init-volume:
-    image: '${DOCKER_LOCAL_REGISTRY_PREFIX}/waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
+    image: '${DOCKER_LOCAL_REGISTRY_PREFIX}waldur-mastermind:${WALDUR_MASTERMIND_IMAGE_TAG}'
     user: root
     volumes:
       - waldur_script_launchzone:/var/lib/waldur/waldur-script-launchzone
