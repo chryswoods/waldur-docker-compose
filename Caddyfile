@@ -44,6 +44,7 @@
 
 	reverse_proxy /api/* http://waldur-mastermind-api:8080
 	reverse_proxy /api-auth/* http://waldur-mastermind-api:8080
+	reverse_proxy /api-auth-browsable/* http://waldur-mastermind-api:8080
 	reverse_proxy /docs/* http://waldur-mastermind-api:8080
 	reverse_proxy /admin/* http://waldur-mastermind-api:8080
 	reverse_proxy /static/* http://waldur-mastermind-api:8080
