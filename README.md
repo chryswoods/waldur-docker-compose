@@ -64,39 +64,63 @@ setup, so make sure you understand what you are doing.
 
 ```bash
 docker compose pull
-docker compose restart
+docker compose down
+docker compose up -d
 ```
 
 ## Upgrade Instructions for PostgreSQL Images
 
-### Upgrade Script
+### Automated Upgrade (Recommended)
 
-To simplify the upgrade process, an upgrade script `db-upgrade-script.sh` is included in the root directory, and can be used to automate the upgrade process.
+To simplify the upgrade process, an upgrade script `db-upgrade-script.sh` is included in the root directory. This script automates the entire upgrade process.
 
 #### Usage Instructions
 
-1. **Ensure the script has execution permissions**:
+1. **Ensure Waldur is running with the current (old) PostgreSQL version that you wish to upgrade from**:
 
    ```bash
-   chmod +x db-upgrade-script.sh
-    ```
+   docker compose up -d
+   ```
 
-2. **Update the `WALDUR_POSTGRES_IMAGE_TAG` and `KEYCLOAK_POSTGRES_IMAGE_TAG` in the `.env` file to the desired versions.**:
+2. **Update the PostgreSQL versions in `.env` file**:
 
     ```sh
     WALDUR_POSTGRES_IMAGE_TAG=<your_version>
     KEYCLOAK_POSTGRES_IMAGE_TAG=<your_version>
     ```
 
-3. **Run the sript**:
+3. **Ensure the script has execution permissions**:
+
+   ```bash
+   chmod +x db-upgrade-script.sh
+   ```
+
+4. **Run the upgrade script**:
 
    ```bash
    ./db-upgrade-script.sh
-    ```
+   ```
 
-### Upgrade Prerequisites
+> **Important**: The script needs the containers to be running with the old PostgreSQL version first so it can back up the existing data before upgrading.
 
-- Backup existing data (if needed).
+The script will automatically:
+
+- Back up both databases
+- Shut down all containers
+- Remove old data directories and volumes
+- Pull new PostgreSQL images
+- Start containers with new PostgreSQL versions
+- Restore data from backups
+- Create SCRAM tokens for PostgreSQL 14+ compatibility
+- Start all containers
+
+### Manual Upgrade (Alternative)
+
+If you prefer to perform the upgrade manually, follow these steps:
+
+#### Manual Prerequisites
+
+- Backup existing data (if needed)
 
 #### Backup Commands
 
@@ -114,32 +138,7 @@ docker exec -it waldur-db pg_dumpall -U waldur > /path/to/backup/waldur_upgrade_
 docker exec -it keycloak-db pg_dumpall -U keycloak > /path/to/backup/keycloak_upgrade_backup.sql
 ```
 
-**Shut down containers:**
-
-```bash
-docker compose down
-```
-
-> **Note:**
-> Before upgrading PostgreSQL, please delete the `pgsql` folder within the project directory if it exists, as well as the `keycloak_db` docker volume if it exists.
-> These were created with the previous PostgreSQL version, and they will be recreated with docker compose during upgrade.
->
-> You can remove the `pgsql` folder by running:
->
-> ```bash
-> sudo rm -r pgsql/
-> ```
->
->
-> To remove the `keycloak_db` volume, run:
->
->```bash
-> docker volume rm waldur-docker-compose_keycloak_db
->```
->
-> **Warning**: This action will delete your existing PostgreSQL data. Ensure it is backed up before proceeding.
-
-### Upgrade Steps
+#### Manual Upgrade Steps
 
 1. **Update PostgreSQL Versions**
 
@@ -150,23 +149,43 @@ docker compose down
     KEYCLOAK_POSTGRES_IMAGE_TAG=<your_version>
     ```
 
-2. **Pull the New Images**
+2. **Shut down containers**
 
-    Pull the new PostgreSQL images:
+    ```bash
+    docker compose down
+    ```
+
+3. **Remove old data directories**
+
+    > **Note:**
+    > The waldur-db uses a bind mount (`./pgsql`) while keycloak-db uses a named volume (`keycloak_db`). Both need to be removed before upgrading.
+    > **Warning**: This action will delete your existing PostgreSQL data. Ensure it is backed up before proceeding.
+
+    **Remove the pgsql directory (waldur-db data):**
+
+    ```bash
+    sudo rm -r pgsql/
+    ```
+
+    **Remove the keycloak_db volume:**
+
+    ```bash
+    docker volume rm waldur-docker-compose_keycloak_db
+    ```
+
+4. **Pull the New Images**
 
     ```bash
     docker compose pull
     ```
 
-3. **Optional: Restore Data** *(if backups have been made)*
-
-    Start the database containers to load the dump data:
+5. **Start database containers**
 
     ```bash
     docker compose up -d waldur-db keycloak-db
     ```
 
-    Restore the contents of the database from the dump file:
+6. **Restore Data** *(if backups have been made)*
 
     **For Waldur DB:**
 
@@ -180,10 +199,9 @@ docker compose down
     cat keycloak_upgrade_backup.sql | docker exec -i keycloak-db psql -U keycloak
     ```
 
-    **Post-update steps**
+7. **Create SCRAM tokens** *(for PostgreSQL 14+)*
 
-    If the new psql version is later than 14, you need to create SCRAM tokens for the existing users.
-    For this, run the following lines, which will automatically create necessary tokens for the users.
+    If the new PostgreSQL version is 14 or later, create SCRAM tokens for existing users:
 
     ```bash
     export $(cat .env | grep "^POSTGRESQL_PASSWORD=" | xargs)
@@ -192,15 +210,13 @@ docker compose down
     docker exec -it keycloak-db psql -U keycloak -c "ALTER USER keycloak WITH PASSWORD '${KEYCLOAK_POSTGRESQL_PASSWORD}';"
     ```
 
-4. **Start containers**
-
-    Start all of the containers:
+8. **Start all containers**
 
     ```bash
     docker compose up -d
     ```
 
-5. **Verify the Upgrade**
+9. **Verify the Upgrade**
 
     Verify the containers are running with the new PostgreSQL version:
 
@@ -304,7 +320,9 @@ All-together /etc/waldur/icons/file_name_from_whitelabeling_directory
 
 ## Readonly PostgreSQL user configuration
 
-In order to enable /api/query/ endpoint please make sure that read-only user is configured.
+In order to enable /api/query/ endpoint please make sure that read-only user is configured both in PostgreSQL and in the environment variables.
+
+### 1. Create PostgreSQL readonly user
 
 ```sql
 -- Create a read-only user
@@ -324,4 +342,40 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {readonly_us
 
 -- Revoke access to authtoken_token table
 REVOKE SELECT ON authtoken_token FROM {readonly_username};
+```
+
+### 2. Configure environment variables
+
+Add the following environment variables to your `.env` file:
+
+```bash
+POSTGRESQL_READONLY_USER={readonly_username}
+POSTGRESQL_READONLY_PASSWORD={readonly_password}
+```
+
+**Note**: Replace `{readonly_password}` with the actual password you used when creating the readonly user, and `{readonly_username}` with your chosen readonly username (e.g., "readonly").
+
+## Migration from bitnami/postgresql to library/postgres DB image
+
+After migration from the bitnami/postgresql to library/postgres DB image, you might notice a working in logs like this:
+
+```log
+...
+WARNING:  database "waldur" has a collation version mismatch
+DETAIL:  The database was created using collation version 2.36, but the operating system provides version 2.41.
+...
+```
+
+In this case, you can simply update the collaction version and reindex the Waldur DB and the public schema:
+
+```postgresql
+-- Run these commands in the psql shell of the waldur-db container
+
+ALTER DATABASE waldur REFRESH COLLATION VERSION;
+ALTER DATABASE postgres REFRESH COLLATION VERSION;
+ALTER DATABASE celery_results REFRESH COLLATION VERSION;
+ALTER DATABASE template1 REFRESH COLLATION VERSION;
+
+REINDEX DATABASE waldur;
+REINDEX SCHEMA public;
 ```
