@@ -15,13 +15,13 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
-            'level': 'DEBUG',
+            'level': 'INFO',
             'stream': sys.stdout,
         },
     },
 
     'root': {
-        'level': 'DEBUG',
+        'level': 'INFO',
         'handlers': ['console'],
     },
 }
