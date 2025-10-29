@@ -69,30 +69,6 @@ Test compose configuration:
         export WALDUR_HOMEPORT_IMAGE_TAG=${TRIGGER_IMAGE_TAG}
       fi
 
-Upload configuration guide:
-  image: "registry.hpc.ut.ee/mirror/library/python:3.8-buster"
-  stage: deploy
-  interruptible: true
-  rules:
-    # If changes are pushed to `develop` branch
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-  variables:
-    GUIDE_PATH: docs/admin-guide/deployment/docker-compose.md
-    IMG_TARGET_PATH: docs/admin-guide/deployment/img
-  script:
-    - cd /tmp/
-    - git clone "https://gitlab-ci-token:$GITLAB_TOKEN@$CI_SERVER_HOST/waldur/waldur-docs.git"
-    - cd waldur-docs
-    - git config --global user.name "$GITLAB_USER_NAME"
-    - git config --global user.email "$GITLAB_USER_EMAIL"
-    - cp -vf ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}/README.md $GUIDE_PATH
-    - mkdir -p docs/admin-guide/deployment/img
-    - cp -vf ${CI_BUILDS_DIR}/${CI_PROJECT_PATH}/img/* $IMG_TARGET_PATH
-    - git add $IMG_TARGET_PATH
-    - git commit $GUIDE_PATH $API_DOCS_PATH $IMG_TARGET_PATH -m "Update configuration guide and API docs" || exit 0
-    - git branch new-configuration-guide
-    - git push --set-upstream origin new-configuration-guide:master
-
 # Override default rules so the job runs for tags automatically
 Trigger dev env update:
   rules:
